@@ -1,8 +1,10 @@
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw
 import pandas as pd
 import os
+import math
 from datetime import datetime
+from streamlit_image_coordinates import streamlit_image_coordinates
 
 st.set_page_config(
     page_title="Third Molar Measurement",
@@ -11,15 +13,22 @@ st.set_page_config(
 )
 
 st.title("🦷 Third Molar Measurement")
-st.caption("Manual third molar measurement and automatic I3M calculation")
+st.caption("Direct measurement on panoramic radiograph")
 
 MASTER_FILE = "Third_Molar_MASTER.xlsx"
-
 TEETH = ["18", "28", "38", "48"]
 
-# ---------------------------------------------------------
-# SUBJECT
-# ---------------------------------------------------------
+# ---------- SESSION ----------
+if "points" not in st.session_state:
+    st.session_state.points = {}
+
+if "measurements" not in st.session_state:
+    st.session_state.measurements = {}
+
+if "last_click" not in st.session_state:
+    st.session_state.last_click = None
+
+# ---------- SUBJECT ----------
 st.subheader("Subject")
 
 c1, c2, c3 = st.columns(3)
@@ -39,28 +48,22 @@ with c2:
 with c3:
     sex = st.selectbox("Sex", ["", "Female", "Male"])
 
-st.divider()
-
-# ---------------------------------------------------------
-# RADIOGRAPH
-# ---------------------------------------------------------
+# ---------- IMAGE ----------
 st.subheader("Panoramic radiograph")
 
 uploaded_file = st.file_uploader(
     "Upload OPT",
-    type=["jpg", "jpeg", "png", "tif", "tiff"]
+    type=["jpg", "jpeg", "png"]
 )
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, use_container_width=True)
+if uploaded_file is None:
+    st.info("Upload a panoramic radiograph to start.")
+    st.stop()
 
-st.divider()
+image = Image.open(uploaded_file).convert("RGB")
 
-# ---------------------------------------------------------
-# TOOTH
-# ---------------------------------------------------------
-st.subheader("Third molar")
+# ---------- TOOTH ----------
+st.subheader("Measurement")
 
 tooth = st.radio(
     "Select tooth",
@@ -68,153 +71,205 @@ tooth = st.radio(
     horizontal=True
 )
 
-root_number = st.radio(
+openings = st.radio(
     "Number of apical openings",
     [1, 2],
-    horizontal=True,
-    key=f"roots_{tooth}"
+    horizontal=True
 )
 
-st.markdown(
-    "🔴 **RED = apical opening(s)**  \n"
-    "🔵 **BLUE = tooth height**"
-)
+key = f"{tooth}_{openings}"
 
-# ---------------------------------------------------------
-# MEASUREMENTS
-# ---------------------------------------------------------
-if root_number == 1:
+if key not in st.session_state.points:
+    st.session_state.points[key] = []
 
-    c1, c2 = st.columns(2)
+points = st.session_state.points[key]
 
-    with c1:
-        a1 = st.number_input(
-            f"🔴 {tooth} — Apical opening A1",
-            min_value=0.0,
-            step=0.01,
-            format="%.3f",
-            key=f"a1_{tooth}"
-        )
+required_points = 4 if openings == 1 else 6
 
-    a2 = 0.0
-
-    with c2:
-        height = st.number_input(
-            f"🔵 {tooth} — Tooth height L",
-            min_value=0.0,
-            step=0.01,
-            format="%.3f",
-            key=f"height_{tooth}"
-        )
-
+if openings == 1:
+    st.markdown(
+        """
+        **Click in this order:**  
+        🔴 **1–2:** apical opening A1  
+        🔵 **3–4:** tooth height L
+        """
+    )
 else:
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        a1 = st.number_input(
-            f"🔴 {tooth} — Apical opening A1",
-            min_value=0.0,
-            step=0.01,
-            format="%.3f",
-            key=f"a1_{tooth}"
-        )
-
-    with c2:
-        a2 = st.number_input(
-            f"🔴 {tooth} — Apical opening A2",
-            min_value=0.0,
-            step=0.01,
-            format="%.3f",
-            key=f"a2_{tooth}"
-        )
-
-    with c3:
-        height = st.number_input(
-            f"🔵 {tooth} — Tooth height L",
-            min_value=0.0,
-            step=0.01,
-            format="%.3f",
-            key=f"height_{tooth}"
-        )
-
-# ---------------------------------------------------------
-# I3M
-# ---------------------------------------------------------
-if height > 0:
-    ratio = (a1 + a2) / height
-
-    st.metric(
-        f"I3M — Tooth {tooth}",
-        f"{ratio:.4f}"
+    st.markdown(
+        """
+        **Click in this order:**  
+        🔴 **1–2:** apical opening A1  
+        🔴 **3–4:** apical opening A2  
+        🔵 **5–6:** tooth height L
+        """
     )
 
-    if root_number == 1:
-        st.caption("I3M = A1 / L")
+# ---------- DRAW CURRENT POINTS ----------
+display_image = image.copy()
+draw = ImageDraw.Draw(display_image)
+
+for i, (x, y) in enumerate(points):
+
+    if openings == 1:
+        is_apex = i < 2
     else:
-        st.caption("I3M = (A1 + A2) / L")
-else:
-    ratio = None
+        is_apex = i < 4
 
-# ---------------------------------------------------------
-# SESSION STORAGE
-# ---------------------------------------------------------
-if "measurements" not in st.session_state:
-    st.session_state.measurements = {}
+    color = "red" if is_apex else "blue"
 
-if st.button(f"Save measurement for tooth {tooth}"):
+    r = 7
+    draw.ellipse(
+        (x-r, y-r, x+r, y+r),
+        fill=color,
+        outline="white",
+        width=2
+    )
 
-    if height <= 0:
-        st.error("Tooth height must be greater than zero.")
+# Draw measurement lines
+if len(points) >= 2:
+    draw.line(
+        [points[0], points[1]],
+        fill="red",
+        width=4
+    )
+
+if openings == 2 and len(points) >= 4:
+    draw.line(
+        [points[2], points[3]],
+        fill="red",
+        width=4
+    )
+
+if openings == 1 and len(points) >= 4:
+    draw.line(
+        [points[2], points[3]],
+        fill="blue",
+        width=4
+    )
+
+if openings == 2 and len(points) >= 6:
+    draw.line(
+        [points[4], points[5]],
+        fill="blue",
+        width=4
+    )
+
+# ---------- CLICKABLE IMAGE ----------
+value = streamlit_image_coordinates(
+    display_image,
+    key=f"image_{key}_{len(points)}"
+)
+
+if value is not None and len(points) < required_points:
+
+    click = (int(value["x"]), int(value["y"]))
+
+    if click != st.session_state.last_click:
+        st.session_state.points[key].append(click)
+        st.session_state.last_click = click
+        st.rerun()
+
+# ---------- CONTROLS ----------
+c1, c2 = st.columns(2)
+
+with c1:
+    if st.button("↩️ Undo last point"):
+        if st.session_state.points[key]:
+            st.session_state.points[key].pop()
+            st.session_state.last_click = None
+            st.rerun()
+
+with c2:
+    if st.button("🗑️ Reset measurement"):
+        st.session_state.points[key] = []
+        st.session_state.last_click = None
+        st.rerun()
+
+st.write(f"Points selected: **{len(points)} / {required_points}**")
+
+# ---------- CALCULATE ----------
+def distance(p1, p2):
+    return math.sqrt(
+        (p2[0] - p1[0]) ** 2 +
+        (p2[1] - p1[1]) ** 2
+    )
+
+if len(points) == required_points:
+
+    if openings == 1:
+
+        A1 = distance(points[0], points[1])
+        A2 = None
+        L = distance(points[2], points[3])
+        I3M = A1 / L if L > 0 else None
 
     else:
+
+        A1 = distance(points[0], points[1])
+        A2 = distance(points[2], points[3])
+        L = distance(points[4], points[5])
+        I3M = (A1 + A2) / L if L > 0 else None
+
+    st.success("Measurement complete")
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric("A1", f"{A1:.2f} px")
+
+    if A2 is not None:
+        c2.metric("A2", f"{A2:.2f} px")
+    else:
+        c2.metric("A2", "—")
+
+    c3.metric("L", f"{L:.2f} px")
+    c4.metric("I3M", f"{I3M:.4f}")
+
+    if st.button(f"✅ Save tooth {tooth}"):
+
         st.session_state.measurements[tooth] = {
-            "Openings": root_number,
-            "A1": a1,
-            "A2": a2 if root_number == 2 else None,
-            "Height": height,
-            "I3M": ratio
+            "Openings": openings,
+            "A1": A1,
+            "A2": A2,
+            "Height": L,
+            "I3M": I3M
         }
 
         st.success(f"Tooth {tooth} saved.")
 
-# ---------------------------------------------------------
-# CURRENT MEASUREMENTS
-# ---------------------------------------------------------
+# ---------- CURRENT TEETH ----------
 if st.session_state.measurements:
 
-    st.subheader("Current measurements")
+    st.divider()
+    st.subheader("Current subject")
 
-    table = []
+    rows = []
 
     for t in TEETH:
+
         if t in st.session_state.measurements:
 
             m = st.session_state.measurements[t]
 
-            table.append({
+            rows.append({
                 "Tooth": t,
                 "Openings": m["Openings"],
-                "A1": round(m["A1"], 3),
+                "A1": round(m["A1"], 2),
                 "A2": (
-                    round(m["A2"], 3)
+                    round(m["A2"], 2)
                     if m["A2"] is not None
                     else ""
                 ),
-                "Height": round(m["Height"], 3),
+                "Height": round(m["Height"], 2),
                 "I3M": round(m["I3M"], 4)
             })
 
     st.dataframe(
-        pd.DataFrame(table),
+        pd.DataFrame(rows),
         use_container_width=True
     )
 
+# ---------- MASTER ----------
 st.divider()
-
-# ---------------------------------------------------------
-# SAVE SUBJECT
-# ---------------------------------------------------------
 st.subheader("Save subject")
 
 if st.button(
@@ -222,11 +277,11 @@ if st.button(
     type="primary"
 ):
 
-    if subject_id.strip() == "":
+    if not subject_id.strip():
         st.error("Enter Subject ID.")
 
     elif not st.session_state.measurements:
-        st.error("No tooth measurements have been saved.")
+        st.error("No measurements saved.")
 
     else:
 
@@ -244,21 +299,21 @@ if st.button(
                 m = st.session_state.measurements[t]
 
                 row[f"{t}_Openings"] = m["Openings"]
-                row[f"{t}_A1"] = m["A1"]
-                row[f"{t}_A2"] = (
+                row[f"{t}_A1_px"] = m["A1"]
+                row[f"{t}_A2_px"] = (
                     m["A2"]
                     if m["A2"] is not None
                     else ""
                 )
-                row[f"{t}_Height"] = m["Height"]
+                row[f"{t}_Height_px"] = m["Height"]
                 row[f"{t}_I3M"] = m["I3M"]
 
             else:
 
                 row[f"{t}_Openings"] = ""
-                row[f"{t}_A1"] = ""
-                row[f"{t}_A2"] = ""
-                row[f"{t}_Height"] = ""
+                row[f"{t}_A1_px"] = ""
+                row[f"{t}_A2_px"] = ""
+                row[f"{t}_Height_px"] = ""
                 row[f"{t}_I3M"] = ""
 
         new_row = pd.DataFrame([row])
@@ -278,7 +333,5 @@ if st.button(
         )
 
         st.success(
-            f"Subject {subject_id} saved successfully."
+            f"Subject {subject_id} saved to master file."
         )
-
-        st.session_state.measurements = {}
