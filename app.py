@@ -5,7 +5,12 @@ import math
 from datetime import datetime
 from io import BytesIO
 from streamlit_image_coordinates import streamlit_image_coordinates
-
+from supabase import create_client
+# Supabase connection
+supabase = create_client(
+    st.secrets["SUPABASE_URL"],
+    st.secrets["SUPABASE_KEY"]
+)
 st.set_page_config(
     page_title="Third Molar Measurement",
     page_icon="🦷",
@@ -450,55 +455,82 @@ if st.button(
                 row[f"{t}_Height_px"] = ""
                 row[f"{t}_I3M"] = ""
 
+               db_row = {
+            "subject_id": st.session_state.subject_id,
+            "age": st.session_state.age,
+            "sex": st.session_state.sex
+        }
+
+        for t in TEETH:
+            m = st.session_state.measurements.get(t)
+
+            db_row[f"{t}_openings"] = m["Openings"] if m else None
+            db_row[f"{t}_a1_px"] = m["A1"] if m else None
+            db_row[f"{t}_a2_px"] = m["A2"] if m else None
+            db_row[f"{t}_height_px"] = m["Height"] if m else None
+            db_row[f"{t}_i3m"] = m["I3M"] if m else None
+
+        supabase.table("third_molar_data").insert(db_row).execute()
+
         st.session_state.master_data.append(row)
 
         st.success(
-            f"Subject {st.session_state.subject_id} added to master."
+            f"Subject {st.session_state.subject_id} added to shared master."
         )
 
 # =========================================================
 # MASTER TABLE + EXCEL
 # =========================================================
-if st.session_state.master_data:
 
-    master_df = pd.DataFrame(
-        st.session_state.master_data
+try:
+    response = (
+        supabase
+        .table("third_molar_data")
+        .select("*")
+        .order("id")
+        .execute()
     )
 
-    st.write(
-        f"Subjects in master: **{len(master_df)}**"
-    )
+    master_df = pd.DataFrame(response.data)
 
-    st.dataframe(
-        master_df,
-        use_container_width=True
-    )
+    if not master_df.empty:
 
-    excel_buffer = BytesIO()
-
-    with pd.ExcelWriter(
-        excel_buffer,
-        engine="openpyxl"
-    ) as writer:
-
-        master_df.to_excel(
-            writer,
-            index=False,
-            sheet_name="Third Molars"
+        st.write(
+            f"Subjects in shared master: **{len(master_df)}**"
         )
 
-    excel_buffer.seek(0)
-
-    st.download_button(
-        label="⬇️ DOWNLOAD MASTER EXCEL",
-        data=excel_buffer,
-        file_name="Third_Molar_MASTER.xlsx",
-        mime=(
-            "application/vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
+        st.dataframe(
+            master_df,
+            use_container_width=True
         )
-    )
 
+        excel_buffer = BytesIO()
+
+        with pd.ExcelWriter(
+            excel_buffer,
+            engine="openpyxl"
+        ) as writer:
+
+            master_df.to_excel(
+                writer,
+                index=False,
+                sheet_name="Third Molars"
+            )
+
+        excel_buffer.seek(0)
+
+        st.download_button(
+            label="⬇️ DOWNLOAD SHARED MASTER EXCEL",
+            data=excel_buffer,
+            file_name="Third_Molar_SHARED_MASTER.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    else:
+        st.info("The shared master is currently empty.")
+
+except Exception as e:
+    st.error(f"Unable to read shared master: {e}")
 # =========================================================
 ## =========================================================
 # NEW SUBJECT
