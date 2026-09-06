@@ -500,14 +500,12 @@ if st.session_state.master_data:
     )
 
 # =========================================================
+## =========================================================
 # NEW SUBJECT
 # =========================================================
 st.divider()
 
-if st.button(
-    "➕ NEW SUBJECT"
-):
-
+def new_subject():
     st.session_state.measurements = {}
     st.session_state.points = {}
     st.session_state.last_click = None
@@ -525,4 +523,7 @@ if st.button(
         if key in st.session_state:
             del st.session_state[key]
 
-    st.rerun()
+st.button(
+    "➕ NEW SUBJECT",
+    on_click=new_subject
+)
