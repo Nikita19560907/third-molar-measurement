@@ -220,7 +220,7 @@ if uploaded_file is not None:
             st.session_state.points[measurement_key].append(click)
             st.session_state.last_click = click
 
-            st.rerun()
+        
 
     # =====================================================
     # CONTROLS
