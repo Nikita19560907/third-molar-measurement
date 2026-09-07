@@ -7,10 +7,15 @@ from io import BytesIO
 from streamlit_image_coordinates import streamlit_image_coordinates
 from supabase import create_client
 # Supabase connection
-supabase = create_client(
-    st.secrets["SUPABASE_URL"],
-    st.secrets["SUPABASE_KEY"]
-)
+@st.cache_resource
+def get_supabase():
+    return create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"]
+    )
+
+supabase = get_supabase()
+
 st.set_page_config(
     page_title="Third Molar Measurement",
     page_icon="🦷",
