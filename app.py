@@ -455,7 +455,7 @@ if st.button(
                 row[f"{t}_Height_px"] = ""
                 row[f"{t}_I3M"] = ""
 
-         db_row = {
+             db_row = {
             "subject_id": st.session_state.subject_id,
             "age": st.session_state.age,
             "sex": st.session_state.sex
