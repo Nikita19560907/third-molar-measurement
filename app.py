@@ -435,56 +435,54 @@ if st.button("💾 ADD SUBJECT TO MASTER", type="primary"):
 # =========================================================
 # MASTER TABLE + EXCEL
 # =========================================================
-
-try:
-    response = (
-        supabase
-        .table("third_molar_data")
-        .select("*")
-        .order("id")
-        .execute()
-    )
-
-    master_df = pd.DataFrame(response.data)
-
-    if not master_df.empty:
-
-        st.write(
-            f"Subjects in shared master: **{len(master_df)}**"
+if st.button("🔄 REFRESH SHARED MASTER"):
+    try:
+        response = (
+            supabase
+            .table("third_molar_data")
+            .select("*")
+            .order("id")
+            .execute()
         )
 
-        st.dataframe(
-            master_df,
-            use_container_width=True
-        )
+        master_df = pd.DataFrame(response.data)
 
-        excel_buffer = BytesIO()
-
-        with pd.ExcelWriter(
-            excel_buffer,
-            engine="openpyxl"
-        ) as writer:
-
-            master_df.to_excel(
-                writer,
-                index=False,
-                sheet_name="Third Molars"
+        if not master_df.empty:
+            st.write(
+                f"Subjects in shared master: **{len(master_df)}**"
             )
 
-        excel_buffer.seek(0)
+            st.dataframe(
+                master_df,
+                use_container_width=True
+            )
 
-        st.download_button(
-            label="⬇️ DOWNLOAD SHARED MASTER EXCEL",
-            data=excel_buffer,
-            file_name="Third_Molar_SHARED_MASTER.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+            excel_buffer = BytesIO()
 
-    else:
-        st.info("The shared master is currently empty.")
+            with pd.ExcelWriter(
+                excel_buffer,
+                engine="openpyxl"
+            ) as writer:
+                master_df.to_excel(
+                    writer,
+                    index=False,
+                    sheet_name="Third Molars"
+                )
 
-except Exception as e:
-    st.error(f"Unable to read shared master: {e}")
+            excel_buffer.seek(0)
+
+            st.download_button(
+                label="⬇️ DOWNLOAD SHARED MASTER EXCEL",
+                data=excel_buffer,
+                file_name="Third_Molar_SHARED_MASTER.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        else:
+            st.info("The shared master is currently empty.")
+
+    except Exception as e:
+        st.error(f"Unable to read shared master: {e}")
 # =========================================================
 ## =========================================================
 # NEW SUBJECT
