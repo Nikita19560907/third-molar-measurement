@@ -401,61 +401,16 @@ if st.session_state.measurements:
 st.divider()
 st.subheader("Master dataset")
 
-if st.button(
-    "💾 ADD SUBJECT TO MASTER",
-    type="primary"
-):
+if st.button("💾 ADD SUBJECT TO MASTER", type="primary"):
 
     if not st.session_state.subject_id.strip():
-
-        st.error(
-            "Enter Subject ID."
-        )
+        st.error("Enter Subject ID.")
 
     elif not st.session_state.measurements:
-
-        st.error(
-            "No tooth measurements saved."
-        )
+        st.error("No tooth measurements saved.")
 
     else:
-
-        row = {
-            "Date": datetime.now().strftime(
-                "%Y-%m-%d %H:%M"
-            ),
-            "ID": st.session_state.subject_id,
-            "Age": st.session_state.age,
-            "Sex": st.session_state.sex
-        }
-
-        for t in TEETH:
-
-            if t in st.session_state.measurements:
-
-                m = st.session_state.measurements[t]
-
-                row[f"{t}_Openings"] = m["Openings"]
-                row[f"{t}_A1_px"] = m["A1"]
-
-                row[f"{t}_A2_px"] = (
-                    m["A2"]
-                    if m["A2"] is not None
-                    else ""
-                )
-
-                row[f"{t}_Height_px"] = m["Height"]
-                row[f"{t}_I3M"] = m["I3M"]
-
-            else:
-
-                row[f"{t}_Openings"] = ""
-                row[f"{t}_A1_px"] = ""
-                row[f"{t}_A2_px"] = ""
-                row[f"{t}_Height_px"] = ""
-                row[f"{t}_I3M"] = ""
-
-             db_row = {
+        db_row = {
             "subject_id": st.session_state.subject_id,
             "age": st.session_state.age,
             "sex": st.session_state.sex
@@ -470,13 +425,13 @@ if st.button(
             db_row[f"{t}_height_px"] = m["Height"] if m else None
             db_row[f"{t}_i3m"] = m["I3M"] if m else None
 
-        supabase.table("third_molar_data").insert(db_row).execute()
-
-        st.session_state.master_data.append(row)
-
-        st.success(
-            f"Subject {st.session_state.subject_id} added to shared master."
-        )
+        try:
+            supabase.table("third_molar_data").insert(db_row).execute()
+            st.success(
+                f"Subject {st.session_state.subject_id} added to shared master."
+            )
+        except Exception as e:
+            st.error(f"Unable to save subject: {e}")
 # =========================================================
 # MASTER TABLE + EXCEL
 # =========================================================
