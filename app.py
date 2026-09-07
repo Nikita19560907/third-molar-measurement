@@ -12,7 +12,7 @@ from streamlit_image_coordinates import streamlit_image_coordinates
     # return create_client(
         # st.secrets["SUPABASE_URL"],
         # st.secrets["SUPABASE_KEY"]
-    )
+ #   )
 
 # supabase = get_supabase()
 supabase = None
