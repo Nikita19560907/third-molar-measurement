@@ -161,7 +161,7 @@ if uploaded_file is not None:
 
         color = "red" if is_apex else "blue"
 
-        r = 7
+        r = 3
 
         draw.ellipse(
             (x-r, y-r, x+r, y+r),
